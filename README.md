@@ -16,8 +16,17 @@ Both fail with a plain `Error` whose message starts with the line number, such a
 
 ## Setup
 
-You need Node 24 or later. I used Node 24.11 and npm 11.19. Run `npm install`, and
-`npx playwright install chromium` if you want to run the end-to-end test.
+You need Node 24 or later. I used Node 24.11 with npm 11.19.
+
+```bash
+npm ci
+npm test
+npm run dev
+```
+
+`npm ci` installs the exact versions in `package-lock.json`, and `npm run dev` serves the demo at
+http://localhost:5173. The end-to-end test also needs Playwright's Chromium, which
+`npx playwright install chromium` downloads once.
 
 | Command             | What it does                                                  |
 | ------------------- | ------------------------------------------------------------- |
@@ -29,30 +38,52 @@ You need Node 24 or later. I used Node 24.11 and npm 11.19. Run `npm install`, a
 | `npm run dev`       | Starts the demo at http://localhost:5173                      |
 | `npm run storybook` | Component stories with the accessibility addon                |
 
-The library has no runtime dependencies. The demo uses React 19.3. Tooling: TypeScript 6.0,
-Vite 8.3, Jest 30.5 with `@swc/jest`, Testing Library 16, ESLint 9, Storybook 10.6, Playwright 1.63
-and `@axe-core/playwright` 4.13. I stayed on TypeScript 6 because typescript-eslint doesn't support
-7 yet.
+## Dependencies and versions
+
+The library has no runtime dependencies. Everything below is a dev dependency, and
+`package-lock.json` pins the exact versions.
+
+| Dependency                                        | Version           | Used for                       |
+| ------------------------------------------------- | ----------------- | ------------------------------ |
+| Node / npm                                        | 24+ / 11          | Running everything             |
+| TypeScript                                        | 6.0               | Library build and typecheck    |
+| React                                             | 19.3              | Demo page                      |
+| Vite                                              | 8.3               | Demo dev server                |
+| Jest, `@swc/jest`                                 | 30.5, 0.2         | Unit and component tests       |
+| Testing Library: React, user-event, jest-dom      | 16.3, 14.6, 7.0   | Component tests                |
+| ESLint, typescript-eslint                         | 9.39, 8.70        | Lint                           |
+| Storybook with the a11y addon                     | 10.6              | Component stories              |
+| Playwright, `@axe-core/playwright`                | 1.63, 4.13        | End-to-end and axe checks      |
+
+I stayed on TypeScript 6 because typescript-eslint 8 only supports TypeScript below 6.1.
 
 ```
-src/                             the library: no React, no DOM; tests sit next to each file
-  index.ts                       evaluateLogFile and evaluateLogStream
-  LogParser.ts                   reads the log line by line with push(chunk) and finish()
-  types.ts                       SensorType, Classification and the rule interfaces
-  sensors/sensorRules.ts         the rule for each sensor type and the reference-line column order
-  sensors/thermometer.ts         the thermometer rule
-  sensors/everyReadingWithin.ts  the keep/discard rule humidity and CO share
-  sensors/comparisons.ts         isWithin and isBelow with a 1e-9 float tolerance
-  sensors/RunningStats.ts        one-pass mean and population standard deviation (Welford)
-demo/                            Vite + React page that uses the library
-  components/LogFileInput/       file input and "Use sample log" button, with its test and stories
-  components/ResultsTable/       results table, with its test and stories
-  hooks/                         useLogEvaluation and its test
-  App.tsx, main.tsx              the page and its entry point, with index.html, styles.css, public/
-e2e/                             Playwright test for the demo
+src/                       the library: no React, no DOM; tests sit next to each file
+  index.ts                 evaluateLogFile and evaluateLogStream
+  LogParser.ts             reads the log line by line with push(chunk) and finish()
+  types.ts                 SensorType, Classification and the rule interfaces
+  sensors/                 the sensor rules and the helpers they share
+    sensorRules.ts         the rule for each sensor type and the reference-line column order
+    thermometer.ts         the thermometer rule
+    everyReadingWithin.ts  the keep/discard rule humidity and CO share
+    comparisons.ts         isWithin and isBelow with a 1e-9 float tolerance
+    RunningStats.ts        one-pass mean and population standard deviation (Welford)
+demo/                      Vite + React page that uses the library
+  components/              one folder per component, with its test and stories
+    LogFileInput/          file input and "Use sample log" button
+    ResultsTable/          results table
+  hooks/                   useLogEvaluation and its test
+  App.tsx, main.tsx        the page and its entry point, with index.html, styles.css, public/
+e2e/                       Playwright test for the demo
 ```
 
 ## Approach
+
+The library is a streaming parser with one rule per sensor type. It reads the log line by line,
+keeps a fixed amount of state per sensor so memory doesn't grow with the log, and stops at the first
+bad line with its line number. `evaluateLogFile` is the function the brief asks for, and
+`evaluateLogStream` runs the same parser on large files. The React page is a small demo on top of
+it. The sections below explain each decision.
 
 ### No DOM in the library
 
@@ -164,9 +195,9 @@ only a supplement. All text meets 4.5:1 contrast (the lowest pair is 5.87:1), ke
 ## What I'd change next
 
 - Named reference values, such as `reference thermometer=70.0 humidity=45.0 monoxide=6`. At the
-   moment, the column order is the contract, so adding a noise detector means every log needs a fourth
-  value, even for rooms with no noise sensors. With names, new types are additive and old logs stay
-  valid.
+  moment, the column order is the contract, so adding a noise detector means every log needs a
+  fourth value, even for rooms with no noise sensors. With names, new types are additive and old
+  logs stay valid.
 - Self-contained reading lines: either put the sensor name on every reading
   (`2007-04-05T22:00 temp-1 72.4`) or move to JSON Lines. Today a reading only makes sense after
   everything above it has been read, so a large log can't be split and processed in parallel.
