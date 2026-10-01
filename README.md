@@ -212,3 +212,35 @@ only a supplement. All text meets 4.5:1 contrast (the lowest pair is 5.87:1), ke
 - A GraphQL service in front of the library if results need to be shared between tools or teams.
   The rules would live in one place, results could be stored, and the library would run in Node
   unchanged.
+
+## How I used AI
+
+I used Claude Code throughout, as a pair rather than an author. I made the design decisions and the plan,
+and reviewed every change before committing it.
+
+### What I decided
+
+- Streaming with a fixed amount of state per sensor, because the brief says production logs will
+  be huge.
+- The `SensorRule` / `createAccumulator` interface, so a new sensor type is a rule and not a
+  parser change.
+- Failing on the first bad line with its line number instead of skipping it, because a skipped
+  reading can change whether a sensor is kept.
+- Population standard deviation, inclusive "within" and strict "under", and the 1e-9 tolerance.
+
+### What I used it for
+
+- Scaffolding the Vite, Jest, Storybook and Playwright setup
+- Drafting boundary test cases, which I then checked against the brief by hand
+- The demo's CSS and contrast checks
+- First drafts of this README, which I rewrote
+- Generating a 434 MB log (20,000 sensors, 20 million readings) to stress-test it
+
+### How I checked the result
+
+I didn't treat passing tests as proof. The tests pin every rule boundary, including
+floating-point cases, and run the sample log split at every possible point with LF and CRLF
+endings. Axe runs on both demo states. After submitting, I benchmarked a generated 434 MB log
+with the heap capped at 48 MB. It ran out of memory: sensor names longer than 12 characters were
+V8 substrings that kept their whole 64 KB chunk alive. The fix and a regression test are in
+[PR #1](https://github.com/alipajand/challenge_cmg_library/pull/1).
