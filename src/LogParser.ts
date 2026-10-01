@@ -18,6 +18,10 @@ function isSensorType(type: string): type is SensorType {
   return Object.hasOwn(sensorRules, type);
 }
 
+function copyString(text: string): string {
+  return [...text].join('');
+}
+
 export class LogParser {
   private unfinishedLine = '';
   private lineNumber = 0;
@@ -106,12 +110,12 @@ export class LogParser {
     }
 
     this.currentSensor = {
-      name,
+      name: copyString(name),
       line: this.lineNumber,
       accumulator: sensorRules[type].createAccumulator(references[type]),
       hasReadings: false,
     };
-    this.sensors.set(name, this.currentSensor);
+    this.sensors.set(this.currentSensor.name, this.currentSensor);
   }
 
   private addReading(timestamp: string, value: string): void {

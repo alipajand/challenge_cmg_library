@@ -1,3 +1,5 @@
+import { setFlagsFromString } from 'node:v8';
+import { runInNewContext } from 'node:vm';
 import { LogParser } from './LogParser.ts';
 
 function parse(log: string) {
@@ -87,6 +89,23 @@ test('keeps sensor names like __proto__ and constructor as own properties', () =
     ['__proto__', 'keep'],
     ['constructor', 'keep'],
   ]);
+});
+
+test('does not keep earlier chunks in memory through sensor names', () => {
+  setFlagsFromString('--expose-gc');
+  const collectGarbage = runInNewContext('gc') as () => void;
+  const readings = '2007-04-05T22:00 70.1\n'.repeat(3000);
+  const parser = new LogParser();
+  parser.push(`${REFERENCE}\n`);
+  collectGarbage();
+  const heapBefore = process.memoryUsage().heapUsed;
+
+  for (let sensor = 0; sensor < 300; sensor += 1) {
+    parser.push(`thermometer temperature-sensor-${sensor}\n${readings}`);
+  }
+  collectGarbage();
+
+  expect(process.memoryUsage().heapUsed - heapBefore).toBeLessThan(5_000_000);
 });
 
 test('joins lines that arrive in separate chunks', () => {
