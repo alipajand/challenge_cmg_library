@@ -77,6 +77,38 @@ demo/                      Vite + React page that uses the library
 e2e/                       Playwright test for the demo
 ```
 
+## Architecture
+
+I separated the parser from the classification logic. The parser is responsible for understanding the log format,
+validating it, and routing readings. The sensor rules own the classification logic and maintain only the state they
+need.
+
+```
+                    Input log
+                       │
+                       ▼
+                    LogParser
+                       │
+             parse / validate / route
+                       │
+                       ▼
+                 Sensor Rules
+                       │
+        ┌──────────────┼──────────────┐
+        ▼              ▼              ▼
+   Thermometer      Humidity       Monoxide
+        │              │              │
+        ▼              ▼              ▼
+   RunningStats       EveryReadingWithin
+        │              │              │
+        └──────────────┼──────────────┘
+                       ▼
+                 Classification
+                       │
+                       ▼
+              Record<sensor, result>
+```
+
 ## Approach
 
 The library is a streaming parser with one rule per sensor type. It reads the log line by line,
